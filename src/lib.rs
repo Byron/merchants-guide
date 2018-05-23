@@ -1,25 +1,59 @@
 extern crate failure;
 
 use failure::{Error, ResultExt};
-use std::io::{BufRead, BufReader, Read, Write};
-use std::io::Cursor;
-use std::str::FromStr;
+use std::{fmt, io::{BufRead, BufReader, Read, Write}, str::FromStr};
 
-#[derive(Debug)]
-struct State {}
+#[derive(Debug, Default)]
+struct ConversionTable {}
 
-impl State {
-    fn has_seen_queries(&self) -> bool {
-        false
-    }
-
-    fn update(&mut self, tokens: impl Iterator<Item = Result<Token, Error>>) -> Result<(), Error> {
+impl ConversionTable {
+    fn update(
+        &mut self,
+        tokens: impl Iterator<Item = Result<Token, Error>>,
+    ) -> Result<Vec<Query>, Error> {
         unimplemented!()
     }
 }
 
+enum Query {
+
+}
+
+enum Roman {
+    I,
+    V,
+    X,
+    L,
+    C,
+    D,
+    M,
+}
+
+impl From<Roman> for u32 {
+    fn from(this: Roman) -> Self {
+        use self::Roman::*;
+        match this {
+            I => 1,
+            V => 5,
+            X => 10,
+            L => 50,
+            C => 100,
+            D => 500,
+            M => 1000,
+        }
+    }
+}
+
 enum Token {
-    RomanNumeralMapping { value: String, roman: String },
+    RomanNumeralMapping { value: String, roman: Roman },
+}
+
+struct Answer<'a>(&'a Query, &'a ConversionTable);
+
+impl<'a> fmt::Display for Answer<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        unimplemented!()
+    }
 }
 
 impl FromStr for Token {
@@ -39,18 +73,15 @@ fn parse(input: impl Read) -> impl Iterator<Item = Result<Token, Error>> {
     })
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self {}
-    }
-}
-
 pub fn answers(mut input: impl Read, mut output: impl Write) -> Result<(), Error> {
-    let mut state = State::default();
-    state.update(parse(input))?;
-    if !state.has_seen_queries() {
-        writeln!(output, "{:?}", state)?;
-        return Ok(());
+    let mut table = ConversionTable::default();
+    let queries = table.update(parse(input))?;
+    if queries.is_empty() {
+        writeln!(output, "{:?}", table)?;
+    } else {
+        for query in queries {
+            writeln!(output, "{}", Answer(&query, &table))?;
+        }
     }
     Ok(())
 }

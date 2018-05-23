@@ -18,6 +18,12 @@ WITH_FAILURE=1
     expect_run ${WITH_FAILURE} "$exe"
   }
 )
+(with "an input file that does not exit"
+  it "fails with an error message" && {
+    WITH_SNAPSHOT="$snapshot/failure-input-file-not-found" \
+    expect_run ${WITH_FAILURE} "$exe" some-file-that-does-not-exist
+  }
+)
 
 (with "the input from the challenge"
   it "produces the expected output" && {
@@ -29,7 +35,6 @@ WITH_FAILURE=1
 (with "in the root directory"
   (when "executing 'make answers'"
     it "produces the correct output" && {
-      WITH_SNAPSHOT="$snapshot/success-input-file-produces-correct-output" \
       expect_run ${SUCCESSFULLY} make answers
     }
   )

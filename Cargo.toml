@@ -1,5 +1,5 @@
 [package]
-name = "galactic-merchant"
+name = "galactic-merchants-guide"
 version = "0.1.0"
 authors = ["Sebastian Thiel <sthiel@thoughtworks.com>"]
 
@@ -8,4 +8,4 @@ failure = "0.1.1"
 
 [[bin]]
 name="guide"
-path="src/main"
+path="src/main.rs"

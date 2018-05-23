@@ -5,7 +5,9 @@ help:
 	$(info journey-tests              | run all stateless journey test)
 	$(info continuous-journey-tests   | run all stateless journey test whenever something changes)
 
-target/debug/guide:
+always:
+
+target/debug/guide: always
 	cargo build
 
 journey-tests: target/debug/guide

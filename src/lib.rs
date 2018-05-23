@@ -1,4 +1,6 @@
+#[macro_use]
 extern crate failure;
+extern crate regex;
 
 use failure::{Error, ResultExt};
 use std::{fmt, io::{BufRead, BufReader, Read, Write}, str::FromStr};
@@ -11,7 +13,14 @@ impl ConversionTable {
         &mut self,
         tokens: impl Iterator<Item = Result<Token, Error>>,
     ) -> Result<Vec<Query>, Error> {
-        unimplemented!()
+        let mut queries = Vec::new();
+        for token in tokens {
+            match token {
+                Ok(token) => unimplemented!(),
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(queries)
     }
 }
 
@@ -60,7 +69,13 @@ impl FromStr for Token {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
-        unimplemented!()
+        let re_set = regex::RegexSet::new(&[r"^\s+(?P<value>\w+)\s+is\s+(?P<roman>\w)$"]).unwrap();
+        let matches = re_set.matches(s);
+        match matches.len() {
+            0 => bail!("Statement '{}' is unknown to us", s),
+            1 => unimplemented!(),
+            _ => bail!("Statement '{}' is ambiguous", s),
+        }
     }
 }
 

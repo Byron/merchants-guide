@@ -1,9 +1,16 @@
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate lazy_static;
 extern crate regex;
 
 use failure::{Error, ResultExt};
 use std::{fmt, io::{BufRead, BufReader, Read, Write}, str::FromStr};
+
+lazy_static! {
+    static ref RE_SET_ROMAN: regex::Regex =
+        regex::Regex::new(r"^\s*(?P<value>\w+)\s+is\s+(?P<roman>\w)\s*$").expect("valid regex");
+}
 
 #[derive(Debug, Default)]
 struct ConversionTable {}
@@ -38,8 +45,26 @@ enum Roman {
     M,
 }
 
+impl FromStr for Roman {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Roman, Error> {
+        use self::Roman::*;
+        Ok(match s {
+            "I" => I,
+            "V" => V,
+            "X" => X,
+            "L" => L,
+            "C" => C,
+            "D" => D,
+            "M" => M,
+            _ => return Err(format_err!("Invalid Roman numeral: '{}'", s)),
+        })
+    }
+}
+
 impl From<Roman> for u32 {
-    fn from(this: Roman) -> Self {
+    fn from(this: Roman) -> u32 {
         use self::Roman::*;
         match this {
             I => 1,
@@ -69,26 +94,26 @@ impl FromStr for Token {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
-        let re_set = regex::RegexSet::new(&[r"^\s+(?P<value>\w+)\s+is\s+(?P<roman>\w)$"]).unwrap();
-        let matches = re_set.matches(s);
-        match matches.len() {
-            0 => bail!("Statement '{}' is unknown to us", s),
-            1 => unimplemented!(),
-            _ => bail!("Statement '{}' is ambiguous", s),
+        match RE_SET_ROMAN.captures(s) {
+            Some(captures) => Ok(Token::RomanNumeralMapping {
+                value: captures["value"].to_owned(),
+                roman: captures["roman"].parse()?,
+            }),
+            _ => Err(format_err!("'{}' could not be parsed", s)),
         }
     }
 }
 
 fn parse(input: impl Read) -> impl Iterator<Item = Result<Token, Error>> {
-    let mut input = BufReader::new(input);
+    let input = BufReader::new(input);
     input.lines().map(|r| {
-        r.context("Failed to read input")
-            .map_err(|err| err.into())
+        r.context("Failed to read at least one line from input")
+            .map_err(Into::into)
             .and_then(|l| l.parse())
     })
 }
 
-pub fn answers(mut input: impl Read, mut output: impl Write) -> Result<(), Error> {
+pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
     let mut table = ConversionTable::default();
     let queries = table.update(parse(input))?;
     if queries.is_empty() {

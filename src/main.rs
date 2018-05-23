@@ -48,10 +48,10 @@ fn run() -> Result<(), Error> {
             env::args().next().expect("program name")
         )
     })?;
-    let mut file_stream = File::open(&filename)
+    let file_stream = File::open(&filename)
         .with_context(|_| format_err!("Could not open '{}' for reading", filename))?;
 
-    galactic_merchants_guide::answers(&mut file_stream, &mut stdout())
+    galactic_merchants_guide::answers(file_stream, stdout())
 }
 
 fn main() {

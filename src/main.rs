@@ -5,6 +5,7 @@ extern crate galactic_merchants_guide;
 use failure::{Error, ResultExt};
 use std::{env, process, fs::File, io::{stderr, stdout, Write}};
 
+// TODO: put this into a crate, like 'failure-print' or 'failure-chain'
 pub fn print_causes<E, W>(e: E, mut w: W)
 where
     E: Into<Error>,
@@ -47,10 +48,10 @@ fn run() -> Result<(), Error> {
             env::args().next().expect("program name")
         )
     })?;
-    let mut filestream = File::open(&filename)
+    let mut file_stream = File::open(&filename)
         .with_context(|_| format_err!("Could not open '{}' for reading", filename))?;
 
-    galactic_merchants_guide::answers(&mut filestream, &mut stdout())
+    galactic_merchants_guide::answers(&mut file_stream, &mut stdout())
 }
 
 fn main() {

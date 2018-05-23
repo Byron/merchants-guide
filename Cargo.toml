@@ -1,0 +1,11 @@
+[package]
+name = "galactic-merchant"
+version = "0.1.0"
+authors = ["Sebastian Thiel <sthiel@thoughtworks.com>"]
+
+[dependencies]
+failure = "0.1.1"
+
+[[bin]]
+name="guide"
+path="src/main"

@@ -25,13 +25,6 @@ WITH_FAILURE=1
   }
 )
 
-(with "input that only sets state"
-  it "outputs a dump of all internal state" && {
-    WITH_SNAPSHOT="$snapshot/success-input-without-any-query-dumps-state" \
-    expect_run ${SUCCESSFULLY} "$exe" "$fixture/state-only.txt"
-  }
-)
-
 (with "the input from the challenge"
   it "produces the expected output" && {
     WITH_SNAPSHOT="$snapshot/success-input-file-produces-correct-output" \

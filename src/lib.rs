@@ -5,7 +5,7 @@ extern crate lazy_static;
 extern crate regex;
 
 use failure::{Error, ResultExt};
-use std::{io::{BufRead, BufReader, Read, Write}, str::FromStr};
+use std::{collections::BTreeMap, io::{BufRead, BufReader, Read, Write}, str::FromStr};
 
 lazy_static! {
     static ref RE_SET_ROMAN: regex::Regex =
@@ -55,8 +55,8 @@ fn roman_to_decimal(romans: &[Roman]) -> Result<u32, Error> {
 
 #[derive(Debug, Default)]
 struct ConversionTable {
-    symbol_to_romans: Vec<(String, Roman)>,
-    product_prices: Vec<(String, f32)>,
+    symbol_to_romans: BTreeMap<String, Roman>,
+    product_prices: BTreeMap<String, f32>,
 }
 
 impl ConversionTable {
@@ -64,7 +64,9 @@ impl ConversionTable {
         values_space_separated
             .split_whitespace()
             .map(|s| {
-                find_by_name(&self.symbol_to_romans, s)
+                self.symbol_to_romans
+                    .get(s)
+                    .cloned()
                     .ok_or_else(|| format_err!("No roman value was associated with symbol '{}'", s))
             })
             .collect()
@@ -85,20 +87,16 @@ impl ConversionTable {
                 Ok(token) => match token {
                     Other(query) => answer(query, self)?,
                     RomanNumeralMapping { symbol, roman } => {
-                        if let None = find_by_name(&self.symbol_to_romans, &symbol) {
-                            self.symbol_to_romans.push((symbol, roman));
-                        }
+                        self.symbol_to_romans.insert(symbol, roman);
                     }
                     PriceAssignment {
                         credits,
                         product,
                         symbols_space_separated,
                     } => {
-                        if let None = find_by_name(&self.product_prices, &product) {
-                            let product_price =
-                                credits / self.symbols_to_decimal(&symbols_space_separated)? as f32;
-                            self.product_prices.push((product, product_price));
-                        }
+                        let product_price =
+                            credits / self.symbols_to_decimal(&symbols_space_separated)? as f32;
+                        self.product_prices.insert(product, product_price);
                     }
                 },
                 Err(err) => return Err(err),
@@ -119,12 +117,6 @@ enum Query {
     },
 }
 
-fn find_by_name<T: Clone>(from: &[(String, T)], what: &str) -> Option<T> {
-    from.iter()
-        .find(|(n, _v)| n == what)
-        .map(|(_n, v)| v.clone())
-}
-
 impl Query {
     fn answer(&self, table: &ConversionTable) -> Result<String, Error> {
         use self::Query::*;
@@ -134,10 +126,9 @@ impl Query {
                 symbols_space_separated,
                 product,
             } => {
-                let single_product_price = find_by_name(&table.product_prices, &product)
-                    .ok_or_else(|| {
-                        format_err!("Product named '{}' was not yet encountered", product)
-                    })?;
+                let single_product_price = table.product_prices.get(product).ok_or_else(
+                    || format_err!("Product named '{}' was not yet encountered", product),
+                )?;
                 let decimal_multiplier = table.symbols_to_decimal(&symbols_space_separated)?;
                 let product_price = decimal_multiplier as f32 * single_product_price;
                 format!(
@@ -155,7 +146,7 @@ impl Query {
     }
 }
 
-#[derive(Debug, Hash, Clone, Copy)]
+#[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Clone, Copy)]
 enum Roman {
     I,
     V,
@@ -260,22 +251,9 @@ fn parse(input: impl Read) -> impl Iterator<Item = Result<Token, Error>> {
 }
 
 pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
-    let mut has_seen_queries = false;
-    let mut table = ConversionTable::default();
-    let res = {
-        let do_answer = |query: Query, table: &ConversionTable| {
-            writeln!(output, "{}", query.answer(table)?)?;
-            has_seen_queries = true;
-            Ok(())
-        };
-
-        table.update(parse(input), do_answer)
+    let do_answer = |query: Query, table: &ConversionTable| {
+        writeln!(output, "{}", query.answer(table)?).map_err(Into::into)
     };
 
-    if has_seen_queries {
-        res
-    } else {
-        writeln!(output, "{:#?}", table)?;
-        Ok(())
-    }
+    ConversionTable::default().update(parse(input), do_answer)
 }

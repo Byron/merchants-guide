@@ -51,10 +51,10 @@ fn symbols_to_decimal(
 enum Query<'a> {
     Other,
     Roman {
-        symbols: Vec<String>,
+        symbols: Vec<&'a str>,
     },
     Product {
-        symbols: Vec<String>,
+        symbols: Vec<&'a str>,
         product: &'a str,
     },
 }
@@ -141,18 +141,18 @@ enum Token<'a> {
     PriceAssignment {
         credits: f32,
         product: &'a str,
-        symbols: Vec<String>,
+        symbols: Vec<&'a str>,
     },
     Other(Query<'a>),
 }
 
 fn token_from_str<'a>(s: &'a str) -> Result<Token<'a>, Error> {
     use self::Token::*;
-    fn to_owned(s: &[&str]) -> Vec<String> {
-        s.iter().map(|&s| String::from(s)).collect()
+    fn to_owned<'a>(s: &[&'a str]) -> Vec<&'a str> {
+        s.iter().cloned().collect()
     }
     let tokens: Vec<_> = s.split_whitespace().collect();
-    Ok(match *tokens.as_slice() {
+    Ok(match *tokens {
         [symbol, "is", roman] => RomanNumeralMapping {
             symbol,
             roman: roman.parse()?,

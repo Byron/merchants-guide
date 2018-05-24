@@ -27,7 +27,7 @@ target/release/guide: always
 	cargo build --release
 
 lint:
-	cargo +nightly clippy
+	cargo clippy
 
 benchmark: target/release/guide
 	hyperfine '$< $(bench_fixture)'

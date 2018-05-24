@@ -1,27 +1,10 @@
+#![feature(slice_patterns)]
+
 #[macro_use]
 extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-extern crate regex;
 
 use failure::{Error, ResultExt};
 use std::{collections::BTreeMap, io::{BufRead, BufReader, Read, Write}, str::FromStr};
-
-lazy_static! {
-    static ref RE_SET_ROMAN: regex::Regex =
-        regex::Regex::new(r"(?i)^\s*(?P<symbol>\w+)\s+is\s+(?P<roman>\w)\s*$").expect("valid regex");
-    static ref RE_ASSIGN_CREDITS: regex::Regex = regex::Regex::new(
-        r"(?i)^\s*(?P<symbols>[\w\s]+)\s+(?P<product>\w+)\s+is\s+(?P<credits>\d+)\s+credits$"
-    ).expect("valid regex");
-    static ref RE_QUERY_ROMAN: regex::Regex = regex::Regex::new(
-        r"(?i)^\s*how\s*much\s+is\s+(?P<symbols>[\w\s]+).*$"
-    ).expect("valid regex");
-    static ref RE_QUERY_PRODUCT: regex::Regex = regex::Regex::new(
-        r"(?i)^\s*how\s*many\s+credits\s+is\s+(?P<symbols>[\w\s]+)\s+(?P<product>\w+).*$"
-    ).expect("valid regex");
-    static ref RE_QUERY_OTHER: regex::Regex =
-        regex::Regex::new(r"(?i)^\s*how\s*much\s+.*$").expect("valid regex");
-}
 
 fn roman_to_decimal(romans: impl Iterator<Item = Roman>) -> Result<u32, Error> {
     let mut decimal = 0;
@@ -200,35 +183,32 @@ impl FromStr for Token {
 
     fn from_str(s: &str) -> Result<Token, Error> {
         use self::Token::*;
-        Ok(if let Some(captures) = RE_SET_ROMAN.captures(s) {
-            RomanNumeralMapping {
-                symbol: captures["symbol"].to_owned(),
-                roman: captures["roman"].parse()?,
-            }
-        } else if let Some(captures) = RE_ASSIGN_CREDITS.captures(s) {
-            PriceAssignment {
-                credits: captures["credits"].parse::<f32>().with_context(|_| {
-                    format!(
-                        "Could not parse floating point number from '{}'",
-                        &captures["credits"]
-                    )
+        let tokens: Vec<_> = s.split_whitespace().collect();
+        Ok(match *tokens.as_slice() {
+            [symbol, "is", roman] => RomanNumeralMapping {
+                symbol: symbol.to_owned(),
+                roman: roman.parse()?,
+            },
+            [ref symbols.., product, "is", credits, "Credits"] => PriceAssignment {
+                credits: credits.parse::<f32>().with_context(|_| {
+                    format!("Could not parse floating point number from '{}'", credits)
                 })?,
-                product: captures["product"].to_owned(),
-                symbols_space_separated: captures["symbols"].to_owned(),
+                product: product.to_owned(),
+                symbols_space_separated: symbols.join(" "),
+            },
+            ["how", "much", "is", ref symbols.., "?"] => Other(Query::Roman {
+                symbols_space_separated: symbols.join(" "),
+            }),
+            ["how", "many", "Credits", "is", ref symbols.., product, "?"] => {
+                Other(Query::Product {
+                    symbols_space_separated: symbols.join(" "),
+                    product: product.to_owned(),
+                })
             }
-        } else if let Some(captures) = RE_QUERY_ROMAN.captures(s) {
-            Other(Query::Roman {
-                symbols_space_separated: captures["symbols"].trim_right().to_owned(),
-            })
-        } else if let Some(captures) = RE_QUERY_PRODUCT.captures(s) {
-            Other(Query::Product {
-                symbols_space_separated: captures["symbols"].to_owned(),
-                product: captures["product"].to_owned(),
-            })
-        } else if RE_QUERY_OTHER.is_match(s) {
-            Other(Query::Other)
-        } else {
-            return Err(format_err!("'{}' could not be parsed", s));
+            ["how", "much", _.., "?"] => return Ok(Other(Query::Other)),
+            _ => {
+                return Err(format_err!("'{}' could not be parsed", s));
+            }
         })
     }
 }

@@ -102,15 +102,19 @@ pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
         let tokens: Vec<_> = line.split_whitespace().collect();
         match *tokens {
             [symbol, "is", roman] => {
-                symbol_to_romans.insert(symbol.to_owned(), roman.parse()?);
+                if !symbol_to_romans.contains_key(symbol) {
+                    symbol_to_romans.insert(symbol.to_owned(), roman.parse()?);
+                }
             }
             [ref symbols.., product, "is", credits, "Credits"] => {
                 let credits = credits.parse::<f32>().with_context(|_| {
                     format!("Could not parse floating point number from '{}'", credits)
                 })?;
-                let product_price =
-                    credits / symbols_to_decimal(&symbol_to_romans, symbols.iter())? as f32;
-                product_prices.insert(product.to_owned(), product_price);
+                if !product_prices.contains_key(product) {
+                    let product_price =
+                        credits / symbols_to_decimal(&symbol_to_romans, symbols.iter())? as f32;
+                    product_prices.insert(product.to_owned(), product_price);
+                }
             }
             ["how", "much", "is", ref symbols.., "?"] => {
                 let decimal_value = symbols_to_decimal(&symbol_to_romans, symbols.iter())?;

@@ -126,9 +126,9 @@ impl Query {
                 symbols_space_separated,
                 product,
             } => {
-                let single_product_price = table.product_prices.get(product).ok_or_else(
-                    || format_err!("Product named '{}' was not yet encountered", product),
-                )?;
+                let single_product_price = table.product_prices.get(product).ok_or_else(|| {
+                    format_err!("Product named '{}' was not yet encountered", product)
+                })?;
                 let decimal_multiplier = table.symbols_to_decimal(&symbols_space_separated)?;
                 let product_price = decimal_multiplier as f32 * single_product_price;
                 format!(

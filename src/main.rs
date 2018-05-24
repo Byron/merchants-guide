@@ -51,7 +51,9 @@ fn run() -> Result<(), Error> {
     let file_stream = File::open(&filename)
         .with_context(|_| format_err!("Could not open '{}' for reading", filename))?;
 
-    galactic_merchants_guide::answers(file_stream, stdout())
+    let stdout = stdout();
+    let lock = stdout.lock();
+    galactic_merchants_guide::answers(file_stream, lock)
 }
 
 fn main() {

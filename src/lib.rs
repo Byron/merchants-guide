@@ -8,15 +8,16 @@ use failure::{Error, ResultExt};
 use std::{io::{BufRead, BufReader, Read, Write}, str::FromStr};
 
 lazy_static! {
-    static ref RE_SET_ROMAN: regex::Regex = regex::Regex::new(
-        r"(?i)^\s*(?P<symbol>\w+)\s+is\s+(?P<roman>\w)\s*$"
-    ).expect("valid regex");
+    static ref RE_SET_ROMAN: regex::Regex =
+        regex::Regex::new(r"(?i)^\s*(?P<symbol>\w+)\s+is\s+(?P<roman>\w)\s*$").expect("valid regex");
     static ref RE_ASSIGN_CREDITS: regex::Regex = regex::Regex::new(
         r"(?i)^\s*(?P<symbols>[\w\s]+)\s+(?P<product>\w+)\s+is\s+(?P<credits>\d+)\s+credits$"
     ).expect("valid regex");
-    // how much is pish tegj glob glob ?
     static ref RE_QUERY_ROMAN: regex::Regex = regex::Regex::new(
-        r"(?i)^\s*how\s*much\s+is\s+(?P<symbols>[\w\s]+)\s+\?\s*$"
+        r"(?i)^\s*how\s*much\s+is\s+(?P<symbols>[\w\s]+).*$"
+    ).expect("valid regex");
+    static ref RE_QUERY_PRODUCT: regex::Regex = regex::Regex::new(
+        r"(?i)^\s*how\s*many\s+credits\s+is\s+(?P<symbols>[\w\s]+)\s+(?P<product>\w+).*$"
     ).expect("valid regex");
 }
 
@@ -63,8 +64,8 @@ impl ConversionTable {
             .map(|t| {
                 self.symbol_to_romans
                     .iter()
-                    .find(|(v, _)| v == t)
-                    .map(|(_, r)| r.to_owned())
+                    .find(|(v, _r)| v == t)
+                    .map(|(_v, r)| r.to_owned())
                     .ok_or_else(|| format_err!("No roman value was associated with '{}'", t))
             })
             .collect()
@@ -111,12 +112,34 @@ impl ConversionTable {
 }
 
 enum Query {
-    Roman { symbols_space_separated: String },
+    Roman {
+        symbols_space_separated: String,
+    },
+    Product {
+        symbols_space_separated: String,
+        product: String,
+    },
 }
 
 impl Query {
     fn answer(&self, table: &ConversionTable) -> Result<String, Error> {
         Ok(match self {
+            Query::Product {
+                symbols_space_separated,
+                product,
+            } => {
+                let single_product_price = table
+                    .product_prices
+                    .iter()
+                    .find(|(p, _v)| p == product)
+                    .map(|(_p, v)| v)
+                    .ok_or_else(|| {
+                        format_err!("Product named '{}' was not yet encountered", product)
+                    })?;
+                let decimal_multiplier = table.symbols_to_decimal(&symbols_space_separated)?;
+                let product_price = decimal_multiplier * single_product_price;
+                format!("{} is {} Credits", symbols_space_separated, product_price)
+            }
             Query::Roman {
                 symbols_space_separated,
             } => {
@@ -208,6 +231,11 @@ impl FromStr for Token {
         } else if let Some(captures) = RE_QUERY_ROMAN.captures(s) {
             Other(Query::Roman {
                 symbols_space_separated: captures["symbols"].to_owned(),
+            })
+        } else if let Some(captures) = RE_QUERY_PRODUCT.captures(s) {
+            Other(Query::Product {
+                symbols_space_separated: captures["symbols"].to_owned(),
+                product: captures["product"].to_owned(),
             })
         } else {
             return Err(format_err!("'{}' could not be parsed", s));

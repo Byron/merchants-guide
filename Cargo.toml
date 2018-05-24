@@ -11,3 +11,8 @@ lazy_static = "1.0.0"
 [[bin]]
 name="guide"
 path="src/main.rs"
+
+[profile.release]
+panic = 'unwind'
+incremental = false
+overflow-checks = true

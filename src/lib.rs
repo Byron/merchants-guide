@@ -23,34 +23,26 @@ lazy_static! {
         regex::Regex::new(r"(?i)^\s*how\s*much\s+.*$").expect("valid regex");
 }
 
-fn roman_to_decimal(romans: &[Roman]) -> Result<u32, Error> {
-    Ok(match romans.len() {
-        0 => bail!("Cannot compute decimal for missing roman value"),
-        1 => romans[0].into(),
-        _ => {
-            let mut decimal = 0;
-            let mut iter = romans.iter().peekable();
-            while let Some(&c) = iter.next() {
-                let c: u32 = c.into();
-                let mut multiplier = 1;
-                if let Some(&&n) = iter.peek() {
-                    let n: u32 = n.into();
-                    if n > c {
-                        multiplier = -1;
-                    }
-                }
-                decimal += i64::from(c) * multiplier;
+fn roman_to_decimal(romans: impl Iterator<Item = Roman>) -> Result<u32, Error> {
+    let mut decimal = 0;
+    let mut iter = romans.peekable();
+    while let Some(c) = iter.next() {
+        let c: u32 = c.into();
+        let mut multiplier = 1;
+        if let Some(&n) = iter.peek() {
+            let n: u32 = n.into();
+            if n > c {
+                multiplier = -1;
             }
-            if decimal < 0 {
-                bail!(
-                    "Converted '{:?}' into negative decimal value {}",
-                    romans,
-                    decimal
-                );
-            }
-            decimal as u32
         }
-    })
+        decimal += i64::from(c) * multiplier;
+    }
+    if decimal == 0 {
+        bail!("No romans literals provided")
+    } else if decimal < 0 {
+        bail!("Converted romans into negative decimal value {}", decimal);
+    }
+    Ok(decimal as u32)
 }
 
 #[derive(Debug, Default)]
@@ -73,7 +65,7 @@ impl ConversionTable {
     }
 
     fn symbols_to_decimal(&self, symbol_space_separated: &str) -> Result<u32, Error> {
-        roman_to_decimal(&self.symbols_to_romans(symbol_space_separated)?)
+        roman_to_decimal(self.symbols_to_romans(symbol_space_separated)?.into_iter())
     }
 
     fn update(

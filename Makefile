@@ -5,6 +5,7 @@ help:
 	$(info -Targets -----------------------------------------------------------------------------)
 	$(info answers                    | produce answers expected by the challenge)
 	$(info -Development Targets -----------------------------------------------------------------)
+	$(info lint                       | run lints with clippy)
 	$(info benchmark                  | just for fun, really)
 	$(info journey-tests              | run all stateless journey test)
 	$(info continuous-journey-tests   | run all stateless journey test whenever something changes)
@@ -16,6 +17,9 @@ target/debug/guide: always
 
 target/release/guide: always
 	cargo build --release
+
+lint: always
+	cargo +nightly clippy
 
 benchmark: target/release/guide
 	hyperfine '$< $(bench_fixture)'

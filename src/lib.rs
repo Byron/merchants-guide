@@ -39,7 +39,7 @@ fn roman_to_decimal(romans: &[Roman]) -> Result<u32, Error> {
                         multiplier = -1;
                     }
                 }
-                decimal += c as i64 * multiplier;
+                decimal += i64::from(c) * multiplier;
             }
             if decimal < 0 {
                 bail!(
@@ -129,7 +129,7 @@ impl Query {
                 let single_product_price = table.product_prices.get(product).ok_or_else(|| {
                     format_err!("Product named '{}' was not yet encountered", product)
                 })?;
-                let decimal_multiplier = table.symbols_to_decimal(&symbols_space_separated)?;
+                let decimal_multiplier = table.symbols_to_decimal(symbols_space_separated)?;
                 let product_price = decimal_multiplier as f32 * single_product_price;
                 format!(
                     "{} {} is {} Credits",
@@ -139,7 +139,7 @@ impl Query {
             Roman {
                 symbols_space_separated,
             } => {
-                let decimal_value = table.symbols_to_decimal(&symbols_space_separated)?;
+                let decimal_value = table.symbols_to_decimal(symbols_space_separated)?;
                 format!("{} is {}", symbols_space_separated, decimal_value)
             }
         })

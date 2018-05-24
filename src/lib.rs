@@ -77,13 +77,13 @@ impl ConversionTable {
     fn update(
         &mut self,
         tokens: impl Iterator<Item = Result<Token, Error>>,
-    ) -> Result<Vec<Query>, Error> {
+        mut answer: impl FnMut(Query, &ConversionTable) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         use self::Token::*;
-        let mut queries = Vec::new();
         for token in tokens {
             match token {
                 Ok(token) => match token {
-                    Other(query) => queries.push(query),
+                    Other(query) => answer(query, self)?,
                     RomanNumeralMapping { symbol, roman } => {
                         if let None = find_by_name(&self.symbol_to_romans, &symbol) {
                             self.symbol_to_romans.push((symbol, roman));
@@ -104,7 +104,7 @@ impl ConversionTable {
                 Err(err) => return Err(err),
             }
         }
-        Ok(queries)
+        Ok(())
     }
 }
 
@@ -260,14 +260,22 @@ fn parse(input: impl Read) -> impl Iterator<Item = Result<Token, Error>> {
 }
 
 pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
+    let mut has_seen_queries = false;
     let mut table = ConversionTable::default();
-    let queries = table.update(parse(input))?;
-    if queries.is_empty() {
-        writeln!(output, "{:#?}", table)?;
+    let res = {
+        let do_answer = |query: Query, table: &ConversionTable| {
+            writeln!(output, "{}", query.answer(table)?)?;
+            has_seen_queries = true;
+            Ok(())
+        };
+
+        table.update(parse(input), do_answer)
+    };
+
+    if has_seen_queries {
+        res
     } else {
-        for query in queries {
-            writeln!(output, "{}", query.answer(&table)?)?;
-        }
+        writeln!(output, "{:#?}", table)?;
+        Ok(())
     }
-    Ok(())
 }

@@ -19,6 +19,8 @@ lazy_static! {
     static ref RE_QUERY_PRODUCT: regex::Regex = regex::Regex::new(
         r"(?i)^\s*how\s*many\s+credits\s+is\s+(?P<symbols>[\w\s]+)\s+(?P<product>\w+).*$"
     ).expect("valid regex");
+    static ref RE_QUERY_OTHER: regex::Regex =
+        regex::Regex::new(r"(?i)^\s*how\s*much\s+.*$").expect("valid regex");
 }
 
 fn roman_to_decimal(romans: &[Roman]) -> Result<u32, Error> {
@@ -54,7 +56,7 @@ fn roman_to_decimal(romans: &[Roman]) -> Result<u32, Error> {
 #[derive(Debug, Default)]
 struct ConversionTable {
     symbol_to_romans: Vec<(String, Roman)>,
-    product_prices: Vec<(String, u32)>,
+    product_prices: Vec<(String, f32)>,
 }
 
 impl ConversionTable {
@@ -93,14 +95,8 @@ impl ConversionTable {
                         product,
                         symbols_space_separated,
                     } => {
-                        let product_price = credits
-                            .checked_div(self.symbols_to_decimal(&symbols_space_separated)?)
-                            .ok_or_else(|| {
-                                format_err!(
-                                    "The roman value corresponding to '{}' was invalid.",
-                                    symbols_space_separated
-                                )
-                            })?;
+                        let product_price =
+                            credits / self.symbols_to_decimal(&symbols_space_separated)? as f32;
                         self.product_prices.push((product, product_price));
                     }
                 },
@@ -112,6 +108,7 @@ impl ConversionTable {
 }
 
 enum Query {
+    Other,
     Roman {
         symbols_space_separated: String,
     },
@@ -123,8 +120,10 @@ enum Query {
 
 impl Query {
     fn answer(&self, table: &ConversionTable) -> Result<String, Error> {
+        use self::Query::*;
         Ok(match self {
-            Query::Product {
+            Other => String::from("I have no idea what you are talking about"),
+            Product {
                 symbols_space_separated,
                 product,
             } => {
@@ -137,10 +136,13 @@ impl Query {
                         format_err!("Product named '{}' was not yet encountered", product)
                     })?;
                 let decimal_multiplier = table.symbols_to_decimal(&symbols_space_separated)?;
-                let product_price = decimal_multiplier * single_product_price;
-                format!("{} is {} Credits", symbols_space_separated, product_price)
+                let product_price = decimal_multiplier as f32 * single_product_price;
+                format!(
+                    "{} {} is {} Credits",
+                    symbols_space_separated, product, product_price
+                )
             }
-            Query::Roman {
+            Roman {
                 symbols_space_separated,
             } => {
                 let decimal_value = table.symbols_to_decimal(&symbols_space_separated)?;
@@ -200,7 +202,7 @@ enum Token {
         roman: Roman,
     },
     PriceAssignment {
-        credits: u32,
+        credits: f32,
         product: String,
         symbols_space_separated: String,
     },
@@ -219,9 +221,9 @@ impl FromStr for Token {
             }
         } else if let Some(captures) = RE_ASSIGN_CREDITS.captures(s) {
             PriceAssignment {
-                credits: captures["credits"].parse::<u32>().with_context(|_| {
+                credits: captures["credits"].parse::<f32>().with_context(|_| {
                     format!(
-                        "Could not obtain unsigned integer from '{}'",
+                        "Could not parse floating point number from '{}'",
                         &captures["credits"]
                     )
                 })?,
@@ -230,13 +232,15 @@ impl FromStr for Token {
             }
         } else if let Some(captures) = RE_QUERY_ROMAN.captures(s) {
             Other(Query::Roman {
-                symbols_space_separated: captures["symbols"].to_owned(),
+                symbols_space_separated: captures["symbols"].trim_right().to_owned(),
             })
         } else if let Some(captures) = RE_QUERY_PRODUCT.captures(s) {
             Other(Query::Product {
                 symbols_space_separated: captures["symbols"].to_owned(),
                 product: captures["product"].to_owned(),
             })
+        } else if RE_QUERY_OTHER.is_match(s) {
+            Other(Query::Other)
         } else {
             return Err(format_err!("'{}' could not be parsed", s));
         })

@@ -20,15 +20,15 @@ ConversionTable {
     product_prices: [
         (
             "Silver",
-            17
+            17.0
         ),
         (
             "Gold",
-            14450
+            14450.0
         ),
         (
             "Iron",
-            195
+            195.5
         )
     ]
 }

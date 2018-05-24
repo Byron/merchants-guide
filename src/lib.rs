@@ -63,12 +63,9 @@ impl ConversionTable {
     fn symbols_to_romans(&self, values_space_separated: &str) -> Result<Vec<Roman>, Error> {
         values_space_separated
             .split_whitespace()
-            .map(|t| {
-                self.symbol_to_romans
-                    .iter()
-                    .find(|(v, _r)| v == t)
-                    .map(|(_v, r)| r.to_owned())
-                    .ok_or_else(|| format_err!("No roman value was associated with '{}'", t))
+            .map(|s| {
+                find_by_name(&self.symbol_to_romans, s)
+                    .ok_or_else(|| format_err!("No roman value was associated with symbol '{}'", s))
             })
             .collect()
     }
@@ -118,6 +115,12 @@ enum Query {
     },
 }
 
+fn find_by_name<T: Clone>(from: &[(String, T)], what: &str) -> Option<T> {
+    from.iter()
+        .find(|(n, _v)| n == what)
+        .map(|(_n, v)| v.clone())
+}
+
 impl Query {
     fn answer(&self, table: &ConversionTable) -> Result<String, Error> {
         use self::Query::*;
@@ -127,11 +130,7 @@ impl Query {
                 symbols_space_separated,
                 product,
             } => {
-                let single_product_price = table
-                    .product_prices
-                    .iter()
-                    .find(|(p, _v)| p == product)
-                    .map(|(_p, v)| v)
+                let single_product_price = find_by_name(&table.product_prices, &product)
                     .ok_or_else(|| {
                         format_err!("Product named '{}' was not yet encountered", product)
                     })?;
@@ -252,7 +251,7 @@ fn parse(input: impl Read) -> impl Iterator<Item = Result<Token, Error>> {
     input.lines().map(|r| {
         r.context("Failed to read at least one line from input")
             .map_err(Into::into)
-            .and_then(|l| l.parse())
+            .and_then(|line| Token::from_str(&line))
     })
 }
 

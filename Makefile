@@ -1,16 +1,24 @@
 fixture = tests/fixtures/input.txt
 bench_fixture = tests/fixtures/big-input.txt
+docker_image = guide_docker_developer_environment
 
 help:
 	$(info -Targets -----------------------------------------------------------------------------)
-	$(info answers                    | produce answers expected by the challenge)
+	$(info answers                      | produce answers expected by the challenge)
+	$(info answers-in-docker            | as above, but uses docker for those without Rust)
+	$(info -- Use docker for all dependencies - run make interactively from there ----------------)
+	$(info interactive-developer-environment-in-docker | gives you everything you need to run all targets)
 	$(info -Development Targets -----------------------------------------------------------------)
-	$(info lint                       | run lints with clippy)
-	$(info benchmark                  | just for fun, really)
-	$(info journey-tests              | run all stateless journey test)
-	$(info continuous-journey-tests   | run all stateless journey test whenever something changes)
+	$(info lint                         | run lints with clippy)
+	$(info benchmark                    | just for fun, really)
+	$(info journey-tests                | run all stateless journey test)
+	$(info continuous-journey-tests     | run all stateless journey test whenever something changes)
 
 always:
+
+interactive-developer-environment-in-docker:
+	docker build -t $(docker_image) - < etc/developer.Dockerfile
+	docker run -v $$PWD:/volume -w /volume -it $(docker_image)
 
 target/debug/guide: always
 	cargo build
@@ -18,7 +26,7 @@ target/debug/guide: always
 target/release/guide: always
 	cargo build --release
 
-lint: always
+lint:
 	cargo +nightly clippy
 
 benchmark: target/release/guide
@@ -29,6 +37,9 @@ journey-tests: target/debug/guide
 
 answers: target/debug/guide
 	$< $(fixture)
+
+answers-in-docker:
+	docker run -v $$PWD:/volume -w /volume rust make answers
 
 continuous-journey-tests:
 	watchexec $(MAKE) journey-tests

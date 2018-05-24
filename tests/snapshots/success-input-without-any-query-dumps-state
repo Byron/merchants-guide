@@ -1,0 +1,1 @@
+ConversionTable { value_to_romans: [("glob", I), ("prok", V), ("pish", X), ("tegj", L)], product_prices: [("Silver", 17), ("Gold", 14450), ("Iron", 195)] }

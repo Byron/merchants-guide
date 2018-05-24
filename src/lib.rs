@@ -5,20 +5,46 @@ extern crate lazy_static;
 extern crate regex;
 
 use failure::{Error, ResultExt};
-use std::{fmt, collections::HashMap, io::{BufRead, BufReader, Read, Write}, str::FromStr};
+use std::{fmt, io::{BufRead, BufReader, Read, Write}, str::FromStr};
 
 lazy_static! {
     static ref RE_SET_ROMAN: regex::Regex =
         regex::Regex::new(r"^\s*(?P<value>\w+)\s+is\s+(?P<roman>\w)\s*$").expect("valid regex");
-//        glob glob Silver is 34 Credits
-    static ref RE_ASSIGN_CREDITS: regex::Regex =
-        regex::Regex::new(r"^\s*(?P<values>\w+\s+)+(?P<product>\w+)\s+is\s+(?P<credits>\d+)\s+[cC]redits$").expect("valid regex");
+    static ref RE_ASSIGN_CREDITS: regex::Regex = regex::Regex::new(
+        r"^\s*(?P<values>[\w\s]+)\s+(?P<product>\w+)\s+is\s+(?P<credits>\d+)\s+[cC]redits$"
+    ).expect("valid regex");
+}
+
+fn roman_value(romans: &[Roman]) -> Result<u32, Error> {
+    Ok(match romans.len() {
+        0 => bail!("Cannot compute value for missing roman value"),
+        1 => romans[0].into(),
+        _ => {
+            let mut value = 0;
+            let mut iter = romans.iter().peekable();
+            while let Some(&c) = iter.next() {
+                let c: u32 = c.into();
+                let mut multiplier = 1;
+                if let Some(&&n) = iter.peek() {
+                    let n: u32 = n.into();
+                    if n > c {
+                        multiplier = -1;
+                    }
+                }
+                value += c as i64 * multiplier;
+            }
+            if value < 0 {
+                bail!("Converted '{:?}' into negative value {}", romans, value);
+            }
+            value as u32
+        }
+    })
 }
 
 #[derive(Debug, Default)]
 struct ConversionTable {
-    value_to_romans: HashMap<String, Roman>,
-    product_prices: HashMap<String, u32>,
+    value_to_romans: Vec<(String, Roman)>,
+    product_prices: Vec<(String, u32)>,
 }
 
 impl ConversionTable {
@@ -30,16 +56,14 @@ impl ConversionTable {
             .split_whitespace()
             .map(|t| {
                 self.value_to_romans
-                    .get(t)
-                    .map(ToOwned::to_owned)
+                    .iter()
+                    .find(|(v, _)| v == t)
+                    .map(|(_, r)| r.to_owned())
                     .ok_or_else(|| format_err!("No roman value was associated with '{}'", t))
             })
             .collect()
     }
 
-    fn roman_value(&self, romans: &[Roman]) -> Result<u32, Error> {
-        unimplemented!()
-    }
 
     fn update(
         &mut self,
@@ -51,7 +75,7 @@ impl ConversionTable {
             match token {
                 Ok(token) => match token {
                     RomanNumeralMapping { value, roman } => {
-                        self.value_to_romans.insert(value, roman);
+                        self.value_to_romans.push((value, roman));
                     }
                     PriceAssignment {
                         credits,
@@ -59,7 +83,7 @@ impl ConversionTable {
                         values_space_separated,
                     } => {
                         let product_price = credits
-                            .checked_div(self.roman_value(&self.translate_values_to_romans(
+                            .checked_div(roman_value(&self.translate_values_to_romans(
                                 &values_space_separated,
                             )?)?)
                             .ok_or_else(|| {
@@ -68,7 +92,7 @@ impl ConversionTable {
                                     values_space_separated
                                 )
                             })?;
-                        self.product_prices.insert(product, product_price);
+                        self.product_prices.push((product, product_price));
                     }
                 },
                 Err(err) => return Err(err),
@@ -82,7 +106,7 @@ enum Query {
 
 }
 
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Hash, Clone, Copy)]
 enum Roman {
     I,
     V,

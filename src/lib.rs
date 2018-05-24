@@ -28,87 +28,51 @@ fn roman_to_decimal(romans: impl Iterator<Item = Roman>) -> Result<u32, Error> {
     Ok(decimal as u32)
 }
 
-#[derive(Debug, Default)]
-struct ConversionTable {
-    symbol_to_romans: BTreeMap<String, Roman>,
-    product_prices: BTreeMap<String, f32>,
-}
-
-impl ConversionTable {
-    fn symbols_to_romans(
-        &self,
-        symbols: impl Iterator<Item = impl AsRef<str>>,
-    ) -> Result<Vec<Roman>, Error> {
-        symbols
-            .map(|s| {
-                self.symbol_to_romans
-                    .get(s.as_ref())
-                    .cloned()
-                    .ok_or_else(|| {
-                        format_err!("No roman value was associated with symbol '{}'", s.as_ref())
-                    })
+fn symbols_to_romans(
+    symbol_to_romans: &BTreeMap<String, Roman>,
+    symbols: impl Iterator<Item = impl AsRef<str>>,
+) -> Result<Vec<Roman>, Error> {
+    symbols
+        .map(|s| {
+            symbol_to_romans.get(s.as_ref()).cloned().ok_or_else(|| {
+                format_err!("No roman value was associated with symbol '{}'", s.as_ref())
             })
-            .collect()
-    }
-
-    fn symbols_to_decimal(
-        &self,
-        symbols: impl Iterator<Item = impl AsRef<str>>,
-    ) -> Result<u32, Error> {
-        roman_to_decimal(self.symbols_to_romans(symbols)?.into_iter())
-    }
-
-    fn update(
-        &mut self,
-        tokens: impl Iterator<Item = Result<Token, Error>>,
-        mut answer: impl FnMut(Query, &ConversionTable) -> Result<(), Error>,
-    ) -> Result<(), Error> {
-        use self::Token::*;
-        for token in tokens {
-            match token {
-                Ok(token) => match token {
-                    Other(query) => answer(query, self)?,
-                    RomanNumeralMapping { symbol, roman } => {
-                        self.symbol_to_romans.insert(symbol, roman);
-                    }
-                    PriceAssignment {
-                        credits,
-                        product,
-                        symbols,
-                    } => {
-                        let product_price =
-                            credits / self.symbols_to_decimal(symbols.iter())? as f32;
-                        self.product_prices.insert(product, product_price);
-                    }
-                },
-                Err(err) => return Err(err),
-            }
-        }
-        Ok(())
-    }
+        })
+        .collect()
 }
 
-enum Query {
+fn symbols_to_decimal(
+    symbol_to_romans: &BTreeMap<String, Roman>,
+    symbols: impl Iterator<Item = impl AsRef<str>>,
+) -> Result<u32, Error> {
+    roman_to_decimal(symbols_to_romans(symbol_to_romans, symbols)?.into_iter())
+}
+
+enum Query<'a> {
     Other,
     Roman {
         symbols: Vec<String>,
     },
     Product {
         symbols: Vec<String>,
-        product: String,
+        product: &'a str,
     },
 }
 
-impl Query {
-    fn answer(&self, table: &ConversionTable) -> Result<String, Error> {
+impl<'a> Query<'a> {
+    fn answer(
+        &self,
+        symbol_to_romans: &BTreeMap<String, Roman>,
+        product_prices: &BTreeMap<String, f32>,
+    ) -> Result<String, Error> {
         use self::Query::*;
         Ok(match self {
             Other => String::from("I have no idea what you are talking about"),
             Product { symbols, product } => {
-                let single_product_price = table.product_prices.get(product).ok_or_else(|| {
-                    format_err!("Product named '{}' was not yet encountered", product)
-                })?;
-                let decimal_multiplier = table.symbols_to_decimal(symbols.iter())?;
+                let single_product_price = product_prices.get(product.to_owned()).ok_or_else(
+                    || format_err!("Product named '{}' was not yet encountered", product),
+                )?;
+                let decimal_multiplier = symbols_to_decimal(symbol_to_romans, symbols.iter())?;
                 let product_price = decimal_multiplier as f32 * single_product_price;
                 format!(
                     "{} {} is {} Credits",
@@ -118,7 +82,7 @@ impl Query {
                 )
             }
             Roman { symbols } => {
-                let decimal_value = table.symbols_to_decimal(symbols.iter())?;
+                let decimal_value = symbols_to_decimal(symbol_to_romans, symbols.iter())?;
                 format!("{} is {}", symbols.join(" "), decimal_value)
             }
         })
@@ -169,70 +133,82 @@ impl From<Roman> for u32 {
     }
 }
 
-enum Token {
+enum Token<'a> {
     RomanNumeralMapping {
-        symbol: String,
+        symbol: &'a str,
         roman: Roman,
     },
     PriceAssignment {
         credits: f32,
-        product: String,
+        product: &'a str,
         symbols: Vec<String>,
     },
-    Other(Query),
+    Other(Query<'a>),
 }
 
-impl FromStr for Token {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Token, Error> {
-        use self::Token::*;
-        fn to_owned(s: &[&str]) -> Vec<String> {
-            s.iter().map(|&s| String::from(s)).collect()
-        }
-        let tokens: Vec<_> = s.split_whitespace().collect();
-        Ok(match *tokens.as_slice() {
-            [symbol, "is", roman] => RomanNumeralMapping {
-                symbol: symbol.to_owned(),
-                roman: roman.parse()?,
-            },
-            [ref symbols.., product, "is", credits, "Credits"] => PriceAssignment {
-                credits: credits.parse::<f32>().with_context(|_| {
-                    format!("Could not parse floating point number from '{}'", credits)
-                })?,
-                product: product.to_owned(),
-                symbols: to_owned(symbols),
-            },
-            ["how", "much", "is", ref symbols.., "?"] => Other(Query::Roman {
-                symbols: to_owned(symbols),
-            }),
-            ["how", "many", "Credits", "is", ref symbols.., product, "?"] => {
-                Other(Query::Product {
-                    symbols: to_owned(symbols),
-                    product: product.to_owned(),
-                })
-            }
-            ["how", "much", _.., "?"] => return Ok(Other(Query::Other)),
-            _ => {
-                return Err(format_err!("'{}' could not be parsed", s));
-            }
-        })
+fn token_from_str<'a>(s: &'a str) -> Result<Token<'a>, Error> {
+    use self::Token::*;
+    fn to_owned(s: &[&str]) -> Vec<String> {
+        s.iter().map(|&s| String::from(s)).collect()
     }
-}
-
-fn parse(input: impl Read) -> impl Iterator<Item = Result<Token, Error>> {
-    let input = BufReader::new(input);
-    input.lines().map(|r| {
-        r.context("Failed to read at least one line from input")
-            .map_err(Into::into)
-            .and_then(|line| Token::from_str(&line))
+    let tokens: Vec<_> = s.split_whitespace().collect();
+    Ok(match *tokens.as_slice() {
+        [symbol, "is", roman] => RomanNumeralMapping {
+            symbol,
+            roman: roman.parse()?,
+        },
+        [ref symbols.., product, "is", credits, "Credits"] => PriceAssignment {
+            credits: credits.parse::<f32>().with_context(|_| {
+                format!("Could not parse floating point number from '{}'", credits)
+            })?,
+            product,
+            symbols: to_owned(symbols),
+        },
+        ["how", "much", "is", ref symbols.., "?"] => Other(Query::Roman {
+            symbols: to_owned(symbols),
+        }),
+        ["how", "many", "Credits", "is", ref symbols.., product, "?"] => Other(Query::Product {
+            symbols: to_owned(symbols),
+            product,
+        }),
+        ["how", "much", _.., "?"] => return Ok(Other(Query::Other)),
+        _ => {
+            return Err(format_err!("'{}' could not be parsed", s));
+        }
     })
 }
 
 pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
-    let do_answer = |query: Query, table: &ConversionTable| {
-        writeln!(output, "{}", query.answer(table)?).map_err(Into::into)
-    };
+    use self::Token::*;
+    let mut symbol_to_romans: BTreeMap<String, Roman> = BTreeMap::new();
+    let mut product_prices: BTreeMap<String, f32> = BTreeMap::new();
+    let input = BufReader::new(input);
 
-    ConversionTable::default().update(parse(input), do_answer)
+    for line in input.lines() {
+        let line = line.context("Failed to read at least one line from input")?;
+        let token = token_from_str(&line);
+        match token {
+            Ok(token) => match token {
+                Other(query) => writeln!(
+                    output,
+                    "{}",
+                    query.answer(&symbol_to_romans, &product_prices)?
+                )?,
+                RomanNumeralMapping { symbol, roman } => {
+                    symbol_to_romans.insert(symbol.to_owned(), roman);
+                }
+                PriceAssignment {
+                    credits,
+                    product,
+                    symbols,
+                } => {
+                    let product_price =
+                        credits / symbols_to_decimal(&symbol_to_romans, symbols.iter())? as f32;
+                    product_prices.insert(product.to_owned(), product_price);
+                }
+            },
+            Err(err) => return Err(err),
+        }
+    }
+    Ok(())
 }

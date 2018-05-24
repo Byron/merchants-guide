@@ -1,4 +1,6 @@
 fixture = tests/fixtures/input.txt
+bench_fixture = tests/fixtures/big-input.txt
+
 help:
 	$(info -Targets -----------------------------------------------------------------------------)
 	$(info answers                    | produce answers expected by the challenge)
@@ -16,7 +18,7 @@ target/release/guide: always
 	cargo build --release
 
 benchmark: target/release/guide
-	hyperfine '$< $(fixture)'
+	hyperfine '$< $(bench_fixture)'
 
 journey-tests: target/debug/guide
 	./tests/stateless-journey.sh $<

@@ -11,6 +11,7 @@ help:
 	$(info -Development Targets -----------------------------------------------------------------)
 	$(info lint                         | run lints with clippy)
 	$(info benchmark                    | just for fun, really)
+	$(info profile                      | only on linux - run callgrind and annotate it)
 	$(info journey-tests                | run all stateless journey test)
 	$(info continuous-journey-tests     | run all stateless journey test whenever something changes)
 
@@ -28,6 +29,10 @@ target/release/guide: always
 
 lint:
 	cargo clippy
+
+profile: target/release/guide
+	valgrind --callgrind-out-file=callgrind.profile --tool=callgrind  $< $(bench_fixture) >/dev/null
+	callgrind_annotate --auto=yes callgrind.profile
 
 benchmark: target/release/guide
 	hyperfine '$< $(bench_fixture)'

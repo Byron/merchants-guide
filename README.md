@@ -17,6 +17,7 @@ Please be warned that initial compilation takes a while.
 
 * [x] shows correct answers
 * [x] fully streaming with minimal state
+* [x] support for profiling
 * [x] support for benchmarking
 * [x] support for linting
 * [x] interactive developer environment in docker

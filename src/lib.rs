@@ -35,20 +35,27 @@ struct ConversionTable {
 }
 
 impl ConversionTable {
-    fn symbols_to_romans(&self, values_space_separated: &str) -> Result<Vec<Roman>, Error> {
-        values_space_separated
-            .split_whitespace()
+    fn symbols_to_romans(
+        &self,
+        symbols: impl Iterator<Item = impl AsRef<str>>,
+    ) -> Result<Vec<Roman>, Error> {
+        symbols
             .map(|s| {
                 self.symbol_to_romans
-                    .get(s)
+                    .get(s.as_ref())
                     .cloned()
-                    .ok_or_else(|| format_err!("No roman value was associated with symbol '{}'", s))
+                    .ok_or_else(|| {
+                        format_err!("No roman value was associated with symbol '{}'", s.as_ref())
+                    })
             })
             .collect()
     }
 
-    fn symbols_to_decimal(&self, symbol_space_separated: &str) -> Result<u32, Error> {
-        roman_to_decimal(self.symbols_to_romans(symbol_space_separated)?.into_iter())
+    fn symbols_to_decimal(
+        &self,
+        symbols: impl Iterator<Item = impl AsRef<str>>,
+    ) -> Result<u32, Error> {
+        roman_to_decimal(self.symbols_to_romans(symbols)?.into_iter())
     }
 
     fn update(
@@ -67,10 +74,10 @@ impl ConversionTable {
                     PriceAssignment {
                         credits,
                         product,
-                        symbols_space_separated,
+                        symbols,
                     } => {
                         let product_price =
-                            credits / self.symbols_to_decimal(&symbols_space_separated)? as f32;
+                            credits / self.symbols_to_decimal(symbols.iter())? as f32;
                         self.product_prices.insert(product, product_price);
                     }
                 },
@@ -84,10 +91,10 @@ impl ConversionTable {
 enum Query {
     Other,
     Roman {
-        symbols_space_separated: String,
+        symbols: Vec<String>,
     },
     Product {
-        symbols_space_separated: String,
+        symbols: Vec<String>,
         product: String,
     },
 }
@@ -97,25 +104,22 @@ impl Query {
         use self::Query::*;
         Ok(match self {
             Other => String::from("I have no idea what you are talking about"),
-            Product {
-                symbols_space_separated,
-                product,
-            } => {
+            Product { symbols, product } => {
                 let single_product_price = table.product_prices.get(product).ok_or_else(|| {
                     format_err!("Product named '{}' was not yet encountered", product)
                 })?;
-                let decimal_multiplier = table.symbols_to_decimal(symbols_space_separated)?;
+                let decimal_multiplier = table.symbols_to_decimal(symbols.iter())?;
                 let product_price = decimal_multiplier as f32 * single_product_price;
                 format!(
                     "{} {} is {} Credits",
-                    symbols_space_separated, product, product_price
+                    symbols.join(" "),
+                    product,
+                    product_price
                 )
             }
-            Roman {
-                symbols_space_separated,
-            } => {
-                let decimal_value = table.symbols_to_decimal(symbols_space_separated)?;
-                format!("{} is {}", symbols_space_separated, decimal_value)
+            Roman { symbols } => {
+                let decimal_value = table.symbols_to_decimal(symbols.iter())?;
+                format!("{} is {}", symbols.join(" "), decimal_value)
             }
         })
     }
@@ -173,7 +177,7 @@ enum Token {
     PriceAssignment {
         credits: f32,
         product: String,
-        symbols_space_separated: String,
+        symbols: Vec<String>,
     },
     Other(Query),
 }
@@ -183,6 +187,9 @@ impl FromStr for Token {
 
     fn from_str(s: &str) -> Result<Token, Error> {
         use self::Token::*;
+        fn to_owned(s: &[&str]) -> Vec<String> {
+            s.iter().map(|&s| String::from(s)).collect()
+        }
         let tokens: Vec<_> = s.split_whitespace().collect();
         Ok(match *tokens.as_slice() {
             [symbol, "is", roman] => RomanNumeralMapping {
@@ -194,14 +201,14 @@ impl FromStr for Token {
                     format!("Could not parse floating point number from '{}'", credits)
                 })?,
                 product: product.to_owned(),
-                symbols_space_separated: symbols.join(" "),
+                symbols: to_owned(symbols),
             },
             ["how", "much", "is", ref symbols.., "?"] => Other(Query::Roman {
-                symbols_space_separated: symbols.join(" "),
+                symbols: to_owned(symbols),
             }),
             ["how", "many", "Credits", "is", ref symbols.., product, "?"] => {
                 Other(Query::Product {
-                    symbols_space_separated: symbols.join(" "),
+                    symbols: to_owned(symbols),
                     product: product.to_owned(),
                 })
             }

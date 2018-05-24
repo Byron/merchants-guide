@@ -85,16 +85,20 @@ impl ConversionTable {
                 Ok(token) => match token {
                     Other(query) => queries.push(query),
                     RomanNumeralMapping { symbol, roman } => {
-                        self.symbol_to_romans.push((symbol, roman));
+                        if let None = find_by_name(&self.symbol_to_romans, &symbol) {
+                            self.symbol_to_romans.push((symbol, roman));
+                        }
                     }
                     PriceAssignment {
                         credits,
                         product,
                         symbols_space_separated,
                     } => {
-                        let product_price =
-                            credits / self.symbols_to_decimal(&symbols_space_separated)? as f32;
-                        self.product_prices.push((product, product_price));
+                        if let None = find_by_name(&self.product_prices, &product) {
+                            let product_price =
+                                credits / self.symbols_to_decimal(&symbols_space_separated)? as f32;
+                            self.product_prices.push((product, product_price));
+                        }
                     }
                 },
                 Err(err) => return Err(err),

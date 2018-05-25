@@ -2,61 +2,94 @@
 
 #[macro_use]
 extern crate failure;
+extern crate lines;
 
+use lines::linereader::LineReader;
 use failure::{Error, ResultExt};
-use std::{collections::BTreeMap, io::{BufRead, BufReader, Read, Write}, str::FromStr};
+use std::{collections::BTreeMap, io::{Read, Write}, str::{FromStr, from_utf8}};
 
 pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
     let mut symbol_to_romans: BTreeMap<String, Roman> = BTreeMap::new();
     let mut product_prices: BTreeMap<String, f32> = BTreeMap::new();
-    let input = BufReader::new(input);
+    let mut reader = LineReader::new(input);
 
-    for line in input.lines() {
-        let line = line.context("Failed to read at least one line from input")?;
-        let tokens: Vec<_> = line.split_whitespace().collect();
+    loop {
+        let line = reader
+            .read_line()
+            .context("Failed to read at least one line from input")?;
+        if line.is_empty() {
+            return Ok(());
+        }
+        let line = &line[0..line.len()-1];
+        let tokens: Vec<_> = line.split(|&b| b == b' ').collect();
         match *tokens {
-            [symbol, "is", roman] => {
-                if !symbol_to_romans.contains_key(symbol) {
-                    symbol_to_romans.insert(symbol.to_owned(), roman.parse()?);
+            [symbol, b"is", roman] => {
+                if !symbol_to_romans.contains_key(from_utf8(symbol)?) {
+                    symbol_to_romans
+                        .insert(from_utf8(symbol)?.to_owned(), from_utf8(roman)?.parse()?);
                 }
             }
-            [ref symbols.., product, "is", credits, "Credits"] => {
+            [ref symbols.., product, b"is", credits, b"Credits"] => {
+                let credits = from_utf8(credits)?;
                 let credits = credits.parse::<f32>().with_context(|_| {
                     format!("Could not parse floating point number from '{}'", credits)
                 })?;
+                let product = from_utf8(product)?;
                 if !product_prices.contains_key(product) {
-                    let product_price =
-                        credits / symbols_to_decimal(&symbol_to_romans, symbols.iter())? as f32;
+                    let product_price = credits
+                        / symbols_to_decimal(
+                            &symbol_to_romans,
+                            symbols.iter().filter_map(|b| from_utf8(b).ok()),
+                        )? as f32;
                     product_prices.insert(product.to_owned(), product_price);
                 }
             }
-            ["how", "much", "is", ref symbols.., "?"] => {
-                let decimal_value = symbols_to_decimal(&symbol_to_romans, symbols.iter())?;
-                writeln!(output, "{} is {}", symbols.join(" "), decimal_value)?;
+            [b"how", b"much", b"is", ref symbols.., b"?"] => {
+                let decimal_value = symbols_to_decimal(
+                    &symbol_to_romans,
+                    symbols.iter().filter_map(|b| from_utf8(b).ok()),
+                )?;
+                writeln!(
+                    output,
+                    "{} is {}",
+                    symbols
+                        .iter()
+                        .filter_map(|b| from_utf8(b).ok())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                    decimal_value
+                )?;
             }
-            ["how", "many", "Credits", "is", ref symbols.., product, "?"] => {
+            [b"how", b"many", b"Credits", b"is", ref symbols.., product, b"?"] => {
+                let product = from_utf8(product)?;
                 let single_product_price = product_prices.get(product).ok_or_else(|| {
                     format_err!("Product named '{}' was not yet encountered", product)
                 })?;
-                let decimal_multiplier = symbols_to_decimal(&symbol_to_romans, symbols.iter())?;
+                let decimal_multiplier = symbols_to_decimal(
+                    &symbol_to_romans,
+                    symbols.iter().filter_map(|b| from_utf8(b).ok()),
+                )?;
                 let product_price = decimal_multiplier as f32 * single_product_price;
                 writeln!(
                     output,
                     "{} {} is {} Credits",
-                    symbols.join(" "),
+                    symbols
+                        .iter()
+                        .filter_map(|b| from_utf8(b).ok())
+                        .collect::<Vec<_>>()
+                        .join(" "),
                     product,
                     product_price
                 )?;
             }
-            ["how", "much", _.., "?"] => {
+            [b"how", b"much", _.., b"?"] => {
                 writeln!(output, "I have no idea what you are talking about")?;
             }
             _ => {
-                return Err(format_err!("'{}' could not be parsed", line));
+                return Err(format_err!("'{}' could not be parsed", from_utf8(line)?));
             }
         }
     }
-    Ok(())
 }
 
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Clone, Copy)]

@@ -5,6 +5,7 @@ authors = ["Sebastian Thiel <sthiel@thoughtworks.com>"]
 
 [dependencies]
 failure = "0.1.1"
+lines = "0.0.6"
 
 [[bin]]
 name="guide"

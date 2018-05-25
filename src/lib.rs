@@ -13,7 +13,11 @@ pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
 
     for line in input.lines() {
         let line = line.context("Failed to read at least one line from input")?;
-        let tokens: Vec<_> = line.split_whitespace().collect();
+        let mut tokens = Vec::with_capacity(10);
+        line.split_whitespace().fold(&mut tokens, |acc, t| {
+            acc.push(t);
+            acc
+        });
         match *tokens {
             [symbol, "is", roman] => {
                 if !symbol_to_romans.contains_key(symbol) {

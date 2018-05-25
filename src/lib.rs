@@ -20,8 +20,12 @@ pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
         if line.is_empty() {
             return Ok(());
         }
-        let line = &line[0..line.len()-1];
-        let tokens: Vec<_> = line.split(|&b| b == b' ').collect();
+        let line = &line[0..line.len() - 1];
+        let mut tokens = Vec::with_capacity(10);
+        line.split(|&b| b == b' ').fold(&mut tokens, |acc, t| {
+            acc.push(t);
+            acc
+        });
         match *tokens {
             [symbol, b"is", roman] => {
                 if !symbol_to_romans.contains_key(from_utf8(symbol)?) {

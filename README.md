@@ -25,7 +25,7 @@ Please be warned that initial compilation takes a while.
 ## Benchmark Results
 
 Even though the Rust Implementation is the fastest, which is mainly due to its non-regex parsing.
-The fastest python3 implementation clocks in at 2.3s, Rust at 1.03s with regex, and 191ms without.
+The fastest python3 implementation clocks in at 2.3s, Rust at 1.03s with regex, and 177ms without.
 Peak memory is 26MB in python and 480kb in Rust.
 Interestingly: as python has plenty of unit-level tests, it clocks in at 311 lines including tests,
 and 162 without. However, Rust has 185 only for the implementation, and 33 lines of bash for journey tests.

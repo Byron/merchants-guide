@@ -4,12 +4,13 @@
 extern crate failure;
 
 use failure::{Error, ResultExt};
-use std::{collections::BTreeMap, io::{BufRead, BufReader, Read, Write}, str::FromStr};
+use std::{collections::BTreeMap, io::{BufRead, BufReader, BufWriter, Read, Write}, str::FromStr};
 
-pub fn answers(input: impl Read, mut output: impl Write) -> Result<(), Error> {
+pub fn answers(input: impl Read, output: impl Write) -> Result<(), Error> {
     let mut symbol_to_romans: BTreeMap<String, Roman> = BTreeMap::new();
     let mut product_prices: BTreeMap<String, f32> = BTreeMap::new();
     let input = BufReader::new(input);
+    let mut output = BufWriter::new(output);
 
     for line in input.lines() {
         let line = line.context("Failed to read at least one line from input")?;

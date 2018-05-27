@@ -2,6 +2,7 @@
 name = "galactic-merchants-guide"
 version = "1.0.0"
 authors = ["Sebastian Thiel <sthiel@thoughtworks.com>"]
+publish = false
 
 [dependencies]
 failure = "0.1.1"

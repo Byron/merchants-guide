@@ -1,3 +1,1 @@
-error: Could not open 'some-file-that-does-not-exist' for reading
-Caused by: 
- 1: No such file or directory (os error 2)
+Error: "merchants app could not find the provided input path - \'some-file-that-does-not-exist\'"

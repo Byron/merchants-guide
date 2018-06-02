@@ -1,27 +1,16 @@
-#[macro_use]
-extern crate failure;
-extern crate failure_tools;
-extern crate galactic_merchants_guide;
+extern crate galactic_merchants_guide as guide;
+use std::fs::File;
 
-use failure_tools::ok_or_exit;
-use failure::{Error, ResultExt};
-use std::{env, fs::File, io::stdout};
-
-fn run() -> Result<(), Error> {
-    let filename = env::args().nth(1).ok_or_else(|| {
-        format_err!(
-            "USAGE: {} <input>\n\nWhere <input> is the input file with statements",
-            env::args().next().expect("program name")
+fn main() -> Result<(), String> {
+    let input_file_path = std::env::args()
+        .nth(1)
+        .ok_or_else(|| "USAGE: merchants <input_file_path>".to_string())?;
+    let file = File::open(&input_file_path).map_err(|_err| {
+        format!(
+            "merchants app could not find the provided input path - '{}'",
+            input_file_path
         )
     })?;
-    let file_stream = File::open(&filename)
-        .with_context(|_| format_err!("Could not open '{}' for reading", filename))?;
 
-    let stdout = stdout();
-    let lock = stdout.lock();
-    galactic_merchants_guide::answers(file_stream, lock)
-}
-
-fn main() {
-    ok_or_exit(run())
+    guide::answer(file)
 }

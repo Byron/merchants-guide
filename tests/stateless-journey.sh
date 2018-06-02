@@ -18,6 +18,7 @@ WITH_FAILURE=1
     expect_run ${WITH_FAILURE} "$exe"
   }
 )
+
 (with "an input file that does not exit"
   it "fails with an error message" && {
     WITH_SNAPSHOT="$snapshot/failure-input-file-not-found" \
